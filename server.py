@@ -216,7 +216,25 @@ def generate_viewer_html_with_data(data):
     
     header_title = "Two Way" if mode == "two" else "Single Way"
     
-    return f"""<!doctype html>
+    # Load template
+    viewer_template_path = TEMPLATES_DIR / "viewer.html"
+    if viewer_template_path.exists():
+        with open(viewer_template_path, "r", encoding="utf-8") as f:
+            template = f.read()
+        
+        # Replace placeholders
+        html = template.replace("{{HEADER_TITLE}}", header_title)
+        html = html.replace("{{ROAD_IMAGE}}", road_image)
+        html = html.replace("{{MODE}}", mode)
+        html = html.replace("{{USE_PICS}}", str(use_pics).lower())
+        html = html.replace("{{PLACEMENTS_JSON}}", json.dumps(placements))
+        html = html.replace("{{ARTWORK_URLS_JSON}}", json.dumps(artwork_urls))
+        
+        return html
+    else:
+        # Fallback to inline HTML if template not found
+        logger.warning("Viewer template not found, using inline HTML")
+        return f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
