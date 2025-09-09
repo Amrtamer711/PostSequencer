@@ -1,311 +1,233 @@
-# Artwork Sequencer Application
+# Artwork Sequencer - Frontend Developer Guide
 
-A web-based application for placing and tracking artwork positions on road images. The application supports both single-way and two-way roads, with options for using numbered markers or actual artwork images.
+A web app for placing and tracking artwork positions on road images. This guide is for frontend developers who want to improve the UI.
 
-## Architecture Overview
+## 🎨 For Frontend Developers - Start Here!
 
-The application is architected with a clear separation between frontend and backend:
+### The Frontend File
+**You only need to edit ONE file**: `web_sequencer.html`
 
-- **Frontend**: Pure HTML/CSS/JavaScript client (web_sequencer.html)
-- **Backend**: FastAPI server providing REST APIs (server.py)
-- **Communication**: All frontend-backend communication happens via REST APIs
+This file contains:
+- All HTML structure
+- All CSS styles (in the `<style>` tag)
+- All JavaScript logic (in the `<script>` tag)
+- PDF.js library for PDF support
 
-## Features
+### What You CAN Change (Frontend)
+✅ **UI/UX Design**
+- Colors, fonts, layouts, animations
+- Button styles, hover effects
+- Responsive design improvements
+- Add new UI components
 
-- Upload road images (PNG, JPG, or PDF) and optionally artwork images
-- Automatic PDF to image conversion (first page)
-- Place blue/red markers on the road image
-- Support for single-way and two-way roads
-- Number mode: Edit numbers inline for each marker
-- Picture mode: Select from uploaded artwork images
-- Drag and drop repositioning of markers
-- Generate shareable client view with untraceable URLs
-- Export final image with markers and detailed report
+✅ **User Interactions**
+- Improve drag & drop behavior
+- Add keyboard shortcuts
+- Better error messages
+- Loading states and animations
 
-## Project Structure
+✅ **Visual Features**
+- Canvas drawing improvements
+- Marker styles and sizes
+- Preview image behaviors
+- Grid/guide lines
 
-```
-/Users/amr/Documents/Pixel Finder/
-├── server.py              # Backend FastAPI server
-├── web_sequencer.html     # Frontend application
-├── requirements.txt       # Python dependencies
-└── README.md             # This file
-```
-
-## Backend API Documentation
-
-### Core Endpoints
-
-#### `GET /`
-Landing page with project overview.
-
-#### `GET /app`
-Serves the main editor application.
-
-#### `GET /health`
-Health check endpoint returning server status and counters.
-
-### API Endpoints
-
-#### `POST /api/create-viewer`
-Creates a shareable viewer link with untraceable UUID.
-
-**Request Body:**
-```json
-{
-  "mode": "single|two",
-  "use_pics": boolean,
-  "placements": [...],
-  "road_image": "data:image/png;base64,...",
-  "artwork_urls": {...},
-  "base_url": "http://localhost:8000"
-}
-```
-
-**Response:**
-```json
-{
-  "viewer_id": "uuid-string",
-  "url": "/viewer/{viewer_id}",
-  "full_url": "http://localhost:8000/viewer/{viewer_id}"
-}
-```
-
-#### `GET /viewer/{viewer_id}`
-Serves the viewer page for a specific ID.
-
-#### `GET /api/viewer/{viewer_id}/data`
-Returns the viewer data (placements, images, etc.).
-
-#### `POST /api/save-result`
-Saves result data (image and report) and returns ID for retrieval.
-
-#### `POST /api/generate-report`
-Generates a detailed report from placement data.
-
-**Request Body:**
-```json
-{
-  "mode": "single|two",
-  "use_pics": boolean,
-  "num_arts": 8,
-  "placements": [...]
-}
-```
-
-## Frontend Guide
-
-### Key Components
-
-1. **State Management**
-   - All state is managed in JavaScript variables
-   - No direct database access
-   - Communication with backend only through APIs
-
-2. **Image Processing**
-   - Images are converted to data URLs for API transmission
-   - Canvas API used for final image generation
-   - All processing happens client-side
-
-3. **User Interface**
-   - Three-panel layout: Instructions (left), Canvas (center), Options (right)
-   - Responsive design that adapts to smaller screens
-   - Dark theme with modern glassmorphism effects
-
-### Modifying the Frontend
-
-#### Adding New Features
-
-1. **UI Elements**: Add to the HTML structure in web_sequencer.html
-2. **Styling**: Update the CSS in the `<style>` section
-3. **Logic**: Add JavaScript functions in the `<script>` section
-
-#### Key Functions to Know
-
-- `onStageClick(e)`: Handles clicks on the canvas to place markers
-- `redraw()`: Redraws all markers on the canvas
-- `processResults()`: Generates final image and calls backend APIs
-- `buildChoices()`: Populates artwork selection panel
-
-#### API Integration Pattern
-
+### What You SHOULD NOT Change (Backend Calls)
+❌ **API Endpoints** - These must stay exactly the same:
 ```javascript
-// Example of calling backend API
-const response = await fetch(`${API_BASE_URL}/api/endpoint`, {
+// Creating a viewer - DON'T CHANGE
+fetch(`${API_BASE_URL}/api/create-viewer`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ data: ... })
+  body: JSON.stringify({
+    mode: MODE,
+    use_pics: USE_PICS,
+    placements: placements,
+    road_image: roadDataUrl,
+    artwork_urls: artworkUrls
+  })
 });
-const result = await response.json();
+
+// Generating reports - DON'T CHANGE
+fetch(`${API_BASE_URL}/api/generate-report`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    mode: MODE,
+    use_pics: USE_PICS,
+    num_arts: NUM_ARTS,
+    placements: placements
+  })
+});
 ```
 
-### Data Flow
+## 🚀 Quick Start
 
-1. User uploads road image → Stored as blob/data URL in frontend
-2. User places markers → Stored in `placements` array
-3. User clicks Done → Frontend generates image and calls APIs
-4. Backend creates viewer ID → Returns untraceable URL
-5. Client view fetches data → Backend serves viewer data
-
-## Running the Application
-
-### Prerequisites
-
-- Python 3.8+
-- Node.js (optional, for development tools)
-
-### Installation
-
-1. Install Python dependencies:
+1. **Run the Backend** (don't worry about how it works):
    ```bash
    pip install -r requirements.txt
-   ```
-
-2. Start the server:
-   ```bash
    uvicorn server:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-3. Open browser to `http://localhost:8000`
+2. **Open the App**: Go to `http://localhost:8000/app`
 
-## Security Considerations
+3. **Edit the Frontend**: Open `web_sequencer.html` in your editor
 
-- Viewer URLs use UUIDs that cannot be traced back to the edit session
-- No authentication implemented (add if needed)
-- CORS is currently open (`allow_origins=["*"]`) - restrict in production
-- In-memory storage - use database for production
+4. **See Changes**: Just refresh your browser!
 
-## Data Cleanup Strategy
+## 📁 File Structure
 
-The server implements a comprehensive 30-day data retention and cleanup strategy:
+```
+/
+├── web_sequencer.html   # ← YOU EDIT THIS (Frontend)
+├── server.py           # ← DON'T TOUCH (Backend)
+├── requirements.txt    # ← DON'T TOUCH (Backend)
+└── data/              # ← DON'T TOUCH (Storage)
+```
 
-### Automatic Cleanup Features
+## 🎯 Key Frontend Concepts
 
-1. **30-Day Retention Policy**
-   - All viewer and result data is automatically deleted after 30 days
-   - Configurable via `DATA_RETENTION_DAYS` variable
+### 1. Main UI Sections
+```html
+<!-- Header with controls -->
+<header>...</header>
 
-2. **Storage Limits**
-   - Maximum 10,000 items stored (configurable via `MAX_STORAGE_ITEMS`)
-   - Oldest items removed when limit is exceeded
+<!-- Left panel with instructions -->
+<div id="left">...</div>
 
-3. **Periodic Cleanup**
-   - Runs every 24 hours automatically
-   - Removes expired data and enforces storage limits
-   - Logs all cleanup activities
+<!-- Center canvas area -->
+<div id="main">
+  <div id="stage">
+    <img id="img" />         <!-- Road image -->
+    <div id="markers"></div> <!-- Marker overlays -->
+  </div>
+</div>
 
-### API Endpoints for Monitoring
+<!-- Right panel with artwork choices -->
+<div id="right">...</div>
 
-#### `GET /api/cleanup-stats`
-View current storage statistics and cleanup information:
-```json
-{
-  "current_viewers": 150,
-  "current_results": 200,
-  "oldest_viewer_days": 25,
-  "oldest_result_days": 28,
-  "retention_policy_days": 30,
-  "max_storage_items": 10000,
-  "next_cleanup_hours": 24
+<!-- Footer with action buttons -->
+<footer>...</footer>
+```
+
+### 2. Key JavaScript Variables
+```javascript
+// Current state - you can read but don't change how they're set
+let MODE = 'single';        // 'single' or 'two' way road
+let USE_PICS = false;       // true = pictures, false = numbers
+let placements = [];        // Array of placed markers
+let roadImage = null;       // The uploaded road image
+let artworks = [];          // Uploaded artwork images
+```
+
+### 3. Key Functions You Might Want to Improve
+
+**Drawing markers on canvas:**
+```javascript
+function redraw() {
+  // This draws all the markers
+  // You can change marker styles here
 }
 ```
 
-#### `POST /api/manual-cleanup`
-Trigger manual cleanup immediately (useful for maintenance).
-
-### Configuration
-
-Adjust these variables in `server.py`:
-```python
-CLEANUP_INTERVAL_HOURS = 24  # How often to run cleanup
-DATA_RETENTION_DAYS = 30     # How long to keep data
-MAX_STORAGE_ITEMS = 10000    # Maximum items to store
+**Handling clicks:**
+```javascript
+function onStageClick(e) {
+  // When user clicks on road image
+  // You can add visual feedback here
+}
 ```
 
-### Storage Implementation
+**Hover previews:**
+```javascript
+function showPreview(e, iconId, imgX) {
+  // Shows artwork preview on hover
+  // You can improve the preview positioning/style
+}
+```
 
-The application uses disk-based storage for viewer HTML files:
-- Viewer HTML files are stored in `/data/` directory
-- Each viewer gets a unique file: `viewer_{uuid}.html`
-- Files are self-contained with all data embedded
-- Metadata is kept in memory for fast access
+## 💡 Frontend Improvement Ideas
 
-On Render deployment:
-- A 1GB persistent disk is mounted at `/data`
-- Files persist across deployments and restarts
-- Automatic cleanup removes files older than 30 days
+### Easy Improvements
+- Add loading spinners during API calls
+- Improve mobile responsiveness
+- Add tooltips for better user guidance
+- Animate marker placement
+- Add a dark/light theme toggle
 
-### Production Recommendations
+### Medium Improvements
+- Add undo/redo functionality (store history in array)
+- Implement zoom in/out for the canvas
+- Add ruler/measurement tools
+- Keyboard shortcuts for common actions
+- Better file upload UI with drag & drop
 
-For larger scale deployments, consider:
-1. **Database Storage**: Replace in-memory metadata with PostgreSQL/MongoDB
-2. **S3/Blob Storage**: Store HTML files in cloud storage for better scalability
-3. **CDN**: Serve viewer files through a CDN for global access
-4. **Monitoring**: Set up alerts for disk usage and cleanup failures
-5. **Archival**: Archive old data instead of deleting if needed for compliance
+### Advanced Improvements
+- Add a minimap for large images
+- Implement marker grouping/selection
+- Add alignment guides when dragging
+- Create a better artwork palette UI
+- Add export to different formats
 
-## Deployment
+## ⚠️ Important Notes
 
-For production deployment:
+1. **Don't change API endpoints** - The backend expects specific data formats
+2. **Keep the data structure** - The `placements` array format must stay the same
+3. **Test PDF uploads** - Make sure PDF conversion still works
+4. **Preserve the viewer generation** - The client view feature must keep working
 
-1. Use a proper database instead of in-memory storage
-2. Add authentication/authorization
-3. Configure CORS appropriately
-4. Use environment variables for configuration
-5. Add proper logging and monitoring
-6. Consider using a CDN for static assets
-7. Implement rate limiting
+## 🧪 Testing Your Changes
 
-## Frontend Development Tips
+1. **Upload a road image** (PNG, JPG, or PDF)
+2. **Click to place markers**
+3. **Try both modes** (Single Way / Two Way)
+4. **Test drag & drop**
+5. **Click "Done" and verify**:
+   - Client View opens correctly
+   - Download Picture matches preview
+   - Download Report has correct data
 
-### State Variables
-- `MODE`: 'single' or 'two' (road type)
-- `USE_PICS`: boolean (pictures vs numbers)
-- `placements`: array of marker positions and values
-- `artworks`: array of uploaded artwork images
+## 🚫 Backend (Don't Touch!)
 
-### Event Handlers
-- Mode changes: Radio buttons update `MODE`
-- Picture mode: Checkbox updates `USE_PICS`
-- File uploads: Handled by `onchange` events
-- Canvas clicks: Managed by `onStageClick`
+The backend handles:
+- Serving the web page
+- Creating viewer links
+- Generating reports
+- Managing storage
+- Cleaning old files
 
-### Styling
-- CSS variables in `:root` for easy theming
-- Responsive grid layout
-- Dark theme with transparency effects
-- Consistent border radius and shadows
+You don't need to understand it - just know it provides the API endpoints your frontend uses.
 
-### Best Practices
-1. Always convert images to data URLs before API calls
-2. Use `async/await` for API calls
-3. Update UI state after successful API responses
-4. Show status messages for user feedback
-5. Validate inputs before API calls
+## 📞 Need Help?
 
-## Troubleshooting
+If you need the backend changed:
+1. Don't edit `server.py` yourself
+2. Ask for the specific API change you need
+3. Explain what data you need to send/receive
 
-### Common Issues
+Remember: Focus on making the UI beautiful and user-friendly. The backend will handle the rest!
 
-1. **Images not loading**: Check CORS settings and ensure proper data URL conversion
-2. **API errors**: Check server logs and browser console
-3. **Viewer not working**: Ensure viewer ID exists in backend storage
-4. **Export failing**: Check canvas rendering and data URL generation
+---
 
-### Debug Mode
+## For Backend Developers Only
 
-Add console.log statements in key functions:
-- `processResults()`: Log API responses
-- `onStageClick()`: Log click coordinates
-- `redraw()`: Log placement data
+<details>
+<summary>Click to expand backend details</summary>
 
-## Future Enhancements
+### Backend Architecture
+- **Framework**: FastAPI with Python
+- **Storage**: File-based HTML storage in `/data/`
+- **Cleanup**: Automatic 30-day retention
+- **Deployment**: Render.com with persistent disk
 
-1. Add persistent storage (PostgreSQL/MongoDB)
-2. Implement user accounts and projects
-3. Add undo/redo functionality
-4. Support for different marker shapes/sizes
-5. Batch operations for markers
-6. Export to different formats (SVG, PDF)
-7. Real-time collaboration features
-8. Mobile app version
+### API Endpoints
+- `POST /api/create-viewer` - Creates viewer with HTML file
+- `GET /viewer/{id}` - Serves viewer HTML from disk
+- `POST /api/generate-report` - Generates text report
+- `GET /api/cleanup-stats` - Monitor storage usage
+
+### Environment Variables
+- `DATA_DIR` - Storage directory (default: `./data`, Render: `/data`)
+- `PORT` - Server port (Render sets automatically)
+
+</details>
