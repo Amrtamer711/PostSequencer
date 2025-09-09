@@ -28,6 +28,8 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parent
 HTML_PATH = BASE_DIR / "web_sequencer.html"
+TEMPLATES_DIR = BASE_DIR / "templates"
+TEMPLATES_DIR.mkdir(exist_ok=True)
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data")).resolve()
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -40,96 +42,15 @@ CLEANUP_INTERVAL_HOURS = 24  # Run cleanup every 24 hours
 DATA_RETENTION_DAYS = 30  # Keep data for 30 days
 MAX_STORAGE_ITEMS = 10000  # Maximum items to store (prevent memory issues)
 
-LANDING_HTML = """
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Artwork Sequencer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{
-      --bg: #0f172a;
-      --panel: #0b1220;
-      --muted: #94a3b8;
-      --text: #e2e8f0;
-      --btn: #22c55e;
-      --btnHover: #16a34a;
-      --accent: #38bdf8;
-    }
-    html, body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(1200px 600px at 10% 10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%); color: var(--text); }
-    .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
-    .card { width: 100%; max-width: 860px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; box-shadow: 0 10px 50px rgba(0,0,0,0.35); overflow: hidden; }
-    .head { padding: 28px 32px; border-bottom: 1px solid rgba(255,255,255,0.06); display:flex; align-items: center; gap:14px; }
-    .logo { width:40px; height:40px; border-radius:10px; background: linear-gradient(135deg, var(--accent), #60a5fa); box-shadow: 0 8px 30px rgba(56,189,248,0.2); }
-    h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: 0.2px; }
-    .sub { font-size: 13px; color: var(--muted); }
-    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; padding: 28px 32px; }
-    .panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 18px; }
-    .panel h3 { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #cbd5e1; letter-spacing: 0.2px; }
-    .list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
-    .cta { display: flex; gap: 12px; align-items: center; margin-top: 18px; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px; border-radius: 10px; background: var(--btn); color: white; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 6px 20px rgba(34,197,94,0.25); transition: all .15s ease; }
-    .btn:hover { background: var(--btnHover); transform: translateY(-1px); }
-    .ghost { background: transparent; border-color: rgba(255,255,255,0.16); color: #dbeafe; }
-    .ghost:hover { background: rgba(255,255,255,0.06); }
-    .foot { padding: 16px 32px; font-size: 12px; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content: space-between; }
-    code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 6px; }
-    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <div class="head">
-        <div class="logo"></div>
-        <div>
-          <h1>Artwork Sequencer</h1>
-          <div class="sub">Place blue/red rectangles on your road image, use numbers or pictures, and export results.</div>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="panel">
-          <h3>What you can do</h3>
-          <ul class="list">
-            <li>Upload a road image and (optionally) a set of N artwork images.</li>
-            <li>Click on the road to place a connected rectangle (blue/red halves).</li>
-            <li>Numbers mode: edit numbers inline. Pictures mode: pick from a right-side panel.</li>
-            <li>Drag to reposition. Hover halves to preview (pictures mode).</li>
-            <li>Download placements.json, final.png, and report.txt.</li>
-          </ul>
-          <div class="cta">
-            <a class="btn" href="/app">Open Editor</a>
-            <a class="btn ghost" href="/health">Health Check</a>
-          </div>
-        </div>
-        <div class="panel">
-          <h3>How it works</h3>
-          <ul class="list">
-            <li>Single Way: one half is used (blue).</li>
-            <li>Two Way: left is blue (Side 1), right is red (Side 2).</li>
-            <li>Exported image uses the same rectangle positions (centered on click).</li>
-            <li>All processing happens in the browser; no upload to server by default.</li>
-          </ul>
-          <div class="cta">
-            <span>Need help? Open the editor and follow the tips at the top.</span>
-          </div>
-        </div>
-      </div>
-      <div class="foot">
-        <div>Server running — open the editor to get started.</div>
-        <div>Tip: bookmark <code>/app</code> for direct access.</div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-"""
-
 @app.get("/")
 def root():
-    return HTMLResponse(LANDING_HTML)
+    landing_html_path = TEMPLATES_DIR / "landing.html"
+    if landing_html_path.exists():
+        with open(landing_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    else:
+        # Fallback if template not found
+        return JSONResponse({"error": "Landing page template not found"}, status_code=404)
 
 @app.get("/app")
 def app_page():
@@ -450,188 +371,6 @@ def generate_viewer_html_with_data(data):
     window.addEventListener('resize', redraw);
     imgEl.onload = redraw;
     redraw();
-  </script>
-</body>
-</html>"""
-
-def generate_viewer_html():
-    """Generate viewer HTML template"""
-    return """<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Artwork Sequence Viewer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{
-      --bg: #0f172a;
-      --panel: rgba(255,255,255,0.03);
-      --border: rgba(255,255,255,0.08);
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-    }
-    html, body { height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; background: radial-gradient(1400px 700px at 10% -10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%); color: var(--text); }
-    #viewer { display: flex; flex-direction: column; height: 100vh; }
-    header { padding: 14px 16px; backdrop-filter: blur(8px); background: linear-gradient(180deg, rgba(2,6,23,0.75), rgba(2,6,23,0.55)); border-bottom: 1px solid var(--border); }
-    header h2 { margin: 0; font-size: 18px; letter-spacing: .2px; font-weight: 700; text-align: center; }
-    #main { flex: 1; position: relative; display:flex; align-items:center; justify-content:center; padding: 12px; }
-    #stage { position: relative; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 50px rgba(2,6,23,0.45); background: #0b1220; }
-    #img { width: 100%; height: 100%; object-fit: contain; display: block; }
-    #markers { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
-    .marker { position:absolute; border:2px solid #000; background:#fff; width:14px; height:28px; display:flex; flex-direction: column; border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.35); pointer-events:auto; }
-    .marker .sq { flex:1; border-bottom:1px solid #000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 9px; color:#fff; cursor: pointer; }
-    .marker .sq:last-child { border-bottom:0; }
-    .marker .sq.side1 { border-color:#0033AA; background:#0066FF; }
-    .marker .sq.side2 { border-color:#AA0000; background:#FF3333; }
-    #preview { position:fixed; display:none; border:1px solid var(--border); background:#0b1220; box-shadow: 0 12px 50px rgba(2,6,23,0.45); padding: 8px; border-radius: 10px; z-index:5; pointer-events: none; }
-    #preview img { max-width:200px; max-height:200px; object-fit:contain; border:1px solid var(--border); border-radius: 8px; }
-    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--muted); }
-  </style>
-</head>
-<body>
-  <div id="viewer">
-    <header>
-      <h2 id="headerTitle">Loading...</h2>
-    </header>
-    <div id="main">
-      <div id="loading">Loading viewer data...</div>
-      <div id="stage" style="display: none;">
-        <img id="img" />
-        <div id="markers"></div>
-        <div id="preview"><img id="prevImg" /></div>
-      </div>
-    </div>
-  </div>
-  <script>
-    // Get viewer ID from URL
-    const pathParts = window.location.pathname.split('/');
-    const viewerId = pathParts[pathParts.indexOf('viewer') + 1];
-    
-    // Fetch viewer data from API
-    fetch(\`/api/viewer/\${viewerId}/data\`)
-      .then(res => res.json())
-      .then(data => {
-        // Initialize viewer with data
-        initializeViewer(data);
-      })
-      .catch(err => {
-        document.getElementById('loading').textContent = 'Error loading viewer data';
-        console.error('Error:', err);
-      });
-    
-    function initializeViewer(data) {
-      const MODE = data.mode || 'single';
-      const USE_PICS = data.use_pics || false;
-      const placements = data.placements || [];
-      const roadImage = data.road_image;
-      const artworkUrls = data.artwork_urls || {};
-      
-      const markerW = 14, markerH = 28;
-      
-      const imgEl = document.getElementById('img');
-      const markersEl = document.getElementById('markers');
-      const previewEl = document.getElementById('preview');
-      const prevImg = document.getElementById('prevImg');
-      const headerTitle = document.getElementById('headerTitle');
-      const stage = document.getElementById('stage');
-      const loading = document.getElementById('loading');
-      
-      // Update header
-      headerTitle.textContent = \`Artwork Sequence - \${MODE === 'two' ? 'Two Way' : 'Single Way'} Road\`;
-      
-      // Set road image
-      imgEl.src = roadImage;
-      imgEl.onload = () => {
-        loading.style.display = 'none';
-        stage.style.display = 'block';
-        redraw();
-      };
-      
-      function getDrawInfo() {
-        const elW = imgEl.clientWidth, elH = imgEl.clientHeight;
-        const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
-        const scale = Math.min(elW/iw, elH/ih);
-        const drawW = iw*scale, drawH = ih*scale;
-        const offX = (elW - drawW)/2;
-        const offY = (elH - drawH)/2;
-        return { elW, elH, iw, ih, scale, drawW, drawH, offX, offY };
-      }
-      
-      function px(x) {
-        const info = getDrawInfo();
-        return info.offX + x*info.scale;
-      }
-      
-      function py(y) {
-        const info = getDrawInfo();
-        return info.offY + y*info.scale;
-      }
-      
-      function redraw() {
-        markersEl.innerHTML = '';
-        for (const p of placements) {
-          const m = document.createElement('div');
-          m.className = 'marker';
-          m.style.left = (px(p.x) - markerW/2) + 'px';
-          m.style.top = (py(p.y) - markerH/2) + 'px';
-          
-          const s1 = document.createElement('div');
-          s1.className = 'sq side1';
-          s1.textContent = (p.s1_num || p.s1_icon || '');
-          
-          const s2 = document.createElement('div');
-          s2.className = 'sq side2';
-          if (MODE === 'two') {
-            s2.textContent = (p.s2_num || p.s2_icon || '');
-          }
-          
-          m.appendChild(s1);
-          if (MODE === 'two') m.appendChild(s2);
-          
-          // Hover preview for pictures
-          if (USE_PICS) {
-            s1.onmouseenter = (e) => showPreview(e, p.s1_icon);
-            s1.onmouseleave = () => hidePreview();
-            if (MODE === 'two') {
-              s2.onmouseenter = (e) => showPreview(e, p.s2_icon);
-              s2.onmouseleave = () => hidePreview();
-            }
-          }
-          
-          markersEl.appendChild(m);
-        }
-      }
-      
-      function showPreview(e, iconId) {
-        if (!iconId || !artworkUrls[iconId]) {
-          hidePreview();
-          return;
-        }
-        prevImg.src = artworkUrls[iconId];
-        previewEl.style.display = 'block';
-        const x = e.clientX + 10;
-        const y = e.clientY + 10;
-        previewEl.style.left = x + 'px';
-        previewEl.style.top = y + 'px';
-      }
-      
-      function hidePreview() {
-        previewEl.style.display = 'none';
-      }
-      
-      // Track mouse movement for preview positioning
-      document.addEventListener('mousemove', (e) => {
-        if (previewEl.style.display === 'block') {
-          const x = Math.min(e.clientX + 10, window.innerWidth - 220);
-          const y = Math.min(e.clientY + 10, window.innerHeight - 220);
-          previewEl.style.left = x + 'px';
-          previewEl.style.top = y + 'px';
-        }
-      });
-      
-      window.addEventListener('resize', redraw);
-    }
   </script>
 </body>
 </html>"""
