@@ -12,7 +12,8 @@ The application is architected with a clear separation between frontend and back
 
 ## Features
 
-- Upload road images and optionally artwork images
+- Upload road images (PNG, JPG, or PDF) and optionally artwork images
+- Automatic PDF to image conversion (first page)
 - Place blue/red markers on the road image
 - Support for single-way and two-way roads
 - Number mode: Edit numbers inline for each marker

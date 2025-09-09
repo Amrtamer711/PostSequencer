@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Artwork Sequencer (Web)</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
   <style>
     :root{
       --bg: #0f172a; /* slate-900 */
@@ -119,7 +121,7 @@
         <div class="sep"></div>
         <div class="row">
           <label>Road Image:</label>
-          <input id="roadInput" type="file" accept="image/*" />
+          <input id="roadInput" type="file" accept="image/*,.pdf" />
         </div>
         <div class="row" id="picsRow" style="display:none">
           <label>Artwork Images:</label>
@@ -135,6 +137,7 @@
       <fieldset>
         <legend>Instructions</legend>
         <div style="font-size:12px;color:#cbd5e1">
+          - Upload road image (PNG, JPG, or PDF).<br/>
           - Click on the road image to place a connected rectangle (blue/red halves).<br/>
           - Numbers mode: click a half to edit the number inline (Enter to save).<br/>
           - Pictures mode: click a half, then pick a billboard on the right panel; hover half to preview.<br/>
@@ -259,11 +262,51 @@
       });
     }
 
+    // Convert PDF to image
+    async function pdfToImage(file) {
+      status('Converting PDF to image...');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+      const page = await pdf.getPage(1); // Get first page
+      
+      const scale = 2; // Higher scale for better quality
+      const viewport = page.getViewport({ scale });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      return blob;
+    }
+
     roadInput.onchange = async () => {
-      const f=roadInput.files?.[0]; if(!f) return;
-      if(roadBlobUrl) URL.revokeObjectURL(roadBlobUrl);
-      roadBlobUrl = URL.createObjectURL(f);
-      roadDataUrl = await blobToDataURL(f);
+      const f = roadInput.files?.[0]; 
+      if (!f) return;
+      
+      if (roadBlobUrl) URL.revokeObjectURL(roadBlobUrl);
+      
+      let fileToProcess = f;
+      
+      // Check if it's a PDF
+      if (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) {
+        try {
+          fileToProcess = await pdfToImage(f);
+        } catch (error) {
+          console.error('Error converting PDF:', error);
+          alert('Error converting PDF. Please try another file.');
+          return;
+        }
+      }
+      
+      roadBlobUrl = URL.createObjectURL(fileToProcess);
+      roadDataUrl = await blobToDataURL(fileToProcess);
       roadImage = new Image(); 
       roadImage.src = roadBlobUrl; 
       await roadImage.decode();
