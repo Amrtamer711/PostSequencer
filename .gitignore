@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+
+# Virtual Environment
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test images and outputs
+*.jpg
+*.png
+*.txt
+!requirements.txt
+!README.md
+
+# Build outputs
+dist/
+build/
+*.spec
+
+# Logs
+*.log

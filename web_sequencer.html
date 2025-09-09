@@ -1,0 +1,874 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artwork Sequencer (Web)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: #0f172a; /* slate-900 */
+      --panel: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.08);
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --btn: #22c55e;
+      --btnHover: #16a34a;
+      --accent: #38bdf8;
+      --cardShadow: 0 12px 50px rgba(2,6,23,0.45);
+    }
+    html, body { height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(1400px 700px at 10% -10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%); color: var(--text); }
+    #app { display: grid; grid-template-columns: 340px 1fr 340px; grid-template-rows: auto 1fr auto; height: 100vh; }
+
+    /* Header toolbar */
+    header { grid-column: 1 / -1; position: sticky; top: 0; z-index: 5; padding: 14px 16px; backdrop-filter: blur(8px); background: linear-gradient(180deg, rgba(2,6,23,0.75), rgba(2,6,23,0.55)); border-bottom: 1px solid var(--border); box-shadow: 0 6px 30px rgba(2,6,23,0.35); }
+    header .bar { display:flex; align-items:center; gap: 14px; width: 100%; max-width: none; margin: 0 auto; flex-wrap: wrap; overflow-x: visible; }
+    header .bar > * { flex: 0 0 auto; }
+    header h2 { margin: 0 10px 0 0; font-size: 18px; letter-spacing: .2px; font-weight: 700; }
+    header .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), #60a5fa); box-shadow: 0 6px 24px rgba(56,189,248,0.25); }
+    header .sep { width:1px; height: 24px; background: var(--border); margin: 0 6px; }
+
+    /* Inputs */
+    .row { display:flex; gap: 8px; align-items:center; white-space: nowrap; }
+    label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    input[type="number"], input[type="file"], select { font: inherit; font-size: 12px; color: #e5e7eb; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; }
+    input[type="file"] { padding: 6px; }
+    #picsRow input[type="file"] { width: 180px; }
+    input[type="radio"], input[type="checkbox"] { accent-color: #60a5fa; }
+    #startBtn { font-weight: 600; padding: 10px 14px; border-radius: 10px; background: var(--btn); color: #fff; border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(34,197,94,0.25); cursor: pointer; transition: all .15s ease; }
+    #startBtn:hover:not(:disabled) { background: var(--btnHover); transform: translateY(-1px); }
+    #startBtn:disabled { opacity: 0.5; cursor: not-allowed; background: #374151; }
+    #doneBtn { font-weight: 600; padding: 10px 14px; border-radius: 10px; background: var(--btn); color: #fff; border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(34,197,94,0.25); cursor: pointer; transition: all .15s ease; display: none; }
+    #doneBtn:hover { background: var(--btnHover); transform: translateY(-1px); }
+    #doneBtnFooter { font-weight: 600; padding: 10px 14px; border-radius: 10px; background: var(--btn); color: #fff; border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(34,197,94,0.25); cursor: pointer; transition: all .15s ease; }
+    #doneBtnFooter:hover { background: var(--btnHover); transform: translateY(-1px); }
+
+    /* Left/Right panes */
+    #left { padding: 14px; border-right: 1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+    #right { padding: 14px; border-left: 1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+    fieldset { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 12px; margin-bottom: 12px; box-shadow: var(--cardShadow); }
+    fieldset legend { padding: 0 6px; font-size: 12px; color: #cbd5e1; font-weight: 700; }
+
+    /* Stage */
+    #main { position: relative; background: radial-gradient(1200px 600px at 50% -30%, rgba(30,41,59,0.35), transparent); display:flex; align-items:center; justify-content:center; }
+    #stage { position: relative; width: calc(100% - 24px); height: calc(100% - 24px); margin: 12px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--cardShadow); background: #0b1220; }
+    #img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #markers { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+
+    /* Marker */
+    .marker { position:absolute; border:2px solid #000; background:#fff; width:14px; height:28px; display:flex; flex-direction: column; cursor:pointer; pointer-events:auto; border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.35); }
+    .marker .sq { flex:1; border-bottom:1px solid #000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 9px; color:#fff; }
+    .marker .sq:last-child { border-bottom:0; }
+    .marker .sq.side1 { border-color:#0033AA; background:#0066FF; }
+    .marker .sq.side2 { border-color:#AA0000; background:#FF3333; }
+    .marker .sq.active { outline:2px solid #fff; outline-offset:-2px; }
+
+    /* Overlay */
+    #overlay { position:absolute; display:none; border:1px solid var(--border); background:#0b1220; box-shadow: var(--cardShadow); padding: 6px; border-radius: 10px; z-index:5; }
+    #overlay .row { gap: 6px; }
+    #overlay input { width: 48px; text-align:center; font-weight: 600; color: #e5e7eb; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+
+    /* Choices/Preview */
+    #choices { max-height: 42vh; overflow:auto; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,0.02); }
+    .choice { display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06); cursor:pointer; }
+    .choice:hover { background: rgba(255,255,255,0.05); }
+    .choice img { width:40px; height:40px; object-fit:contain; border:1px solid var(--border); border-radius: 8px; }
+    #preview img { max-width:100%; max-height:30vh; object-fit:contain; border:1px solid var(--border); border-radius: 10px; }
+
+    /* Footer */
+    footer { grid-column: 1 / -1; border-top: 1px solid var(--border); padding: 10px 14px; display:flex; gap:10px; align-items:center; justify-content: space-between; background: linear-gradient(180deg, rgba(2,6,23,0.55), rgba(2,6,23,0.75)); }
+    .btns button { font-weight:600; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background: rgba(255,255,255,0.06); color:#e5e7eb; box-shadow: 0 6px 16px rgba(2,6,23,0.35); cursor: pointer; }
+    .btns button:hover { background: rgba(255,255,255,0.12); }
+    #viewerBtn { background: var(--accent); color:#fff; }
+    #viewerBtn:hover { background: #0ea5e9; }
+    #downloadFinal { background: var(--btn); color:#fff; }
+    #downloadFinal:hover { background: var(--btnHover); }
+    #status { font-size: 12px; color: var(--muted); }
+
+    /* Results page styles */
+    .results-wrap { max-width:820px; margin:0 auto; padding:20px; }
+    .results-wrap h2 { margin:0 0 14px 0; }
+    .card { border:1px solid var(--border); border-radius:12px; background: rgba(255,255,255,0.03); padding:14px; margin-bottom:12px; }
+    .card .row { display:flex; flex-direction:column; gap:8px; }
+    a.btn { display:inline-block; padding:10px 14px; border-radius:10px; color:#fff; text-decoration:none; font-weight:600; border:1px solid var(--border); cursor: pointer; }
+    a.primary { background: var(--btn); }
+    a.secondary { background: #3b82f6; }
+    code { display:block; word-break:break-all; color: var(--muted); font-size:12px; background: rgba(255,255,255,0.04); padding:8px; border-radius:8px; border:1px solid var(--border); }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+
+    @media (max-width: 1200px){ #app{ grid-template-columns: 280px 1fr 280px; } }
+    @media (max-width: 900px){ #app{ grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; } #right{ order: 3; } #left{ order: 2; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="bar">
+        <div class="logo"></div><h2>Artwork Sequencer</h2><div class="sep"></div>
+        <div class="row">
+          <label><input type="radio" name="mode" value="single" checked /> Single Way</label>
+          <label><input type="radio" name="mode" value="two" /> Two Way</label>
+        </div>
+        <div class="row">
+          <label>Unique Artworks:</label>
+          <input id="numArtworks" type="number" min="1" value="8" style="width:70px" />
+        </div>
+        <div class="row">
+          <label><input id="usePics" type="checkbox" /> Use Pictures</label>
+        </div>
+        <div class="sep"></div>
+        <div class="row">
+          <label>Road Image:</label>
+          <input id="roadInput" type="file" accept="image/*" />
+        </div>
+        <div class="row" id="picsRow" style="display:none">
+          <label>Artwork Images:</label>
+          <input id="picsInput" type="file" accept="image/*" multiple />
+        </div>
+        <div class="sep"></div>
+        <button id="startBtn">Start</button>
+        <button id="doneBtn">Done</button>
+      </div>
+    </header>
+
+    <div id="left">
+      <fieldset>
+        <legend>Instructions</legend>
+        <div style="font-size:12px;color:#cbd5e1">
+          - Click on the road image to place a connected rectangle (blue/red halves).<br/>
+          - Numbers mode: click a half to edit the number inline (Enter to save).<br/>
+          - Pictures mode: click a half, then pick a billboard on the right panel; hover half to preview.<br/>
+          - Two Way mode: use Up/Down arrow keys to switch between blue/red sides.<br/>
+          - Drag rectangles to reposition.<br/>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Info</legend>
+        <div id="infoText" style="font-size:12px;color:#94a3b8"></div>
+      </fieldset>
+    </div>
+
+    <div id="main">
+      <div id="stage">
+        <img id="img" />
+        <div id="markers"></div>
+        <div id="overlay"></div>
+      </div>
+    </div>
+
+    <div id="right">
+      <fieldset id="choicesBox" style="display:none">
+        <legend>Billboard Choices</legend>
+        <div id="choices"></div>
+      </fieldset>
+      <fieldset id="previewBox" style="display:none">
+        <legend>Preview</legend>
+        <div id="preview"><img id="prevImg" /></div>
+      </fieldset>
+    </div>
+
+    <footer>
+      <div class="btns" id="editBtns" style="display:none">
+        <button id="resetBtn">Reset All</button>
+        <button id="doneBtnFooter">Done</button>
+      </div>
+      <div class="btns" id="doneBtns" style="display:none">
+        <button id="viewerBtn">Open Client View</button>
+        <button id="downloadFinal">Download Picture</button>
+        <button id="downloadReport">Download report.txt</button>
+        <button id="backToEdit">Back to Edit</button>
+      </div>
+      <div id="status"></div>
+    </footer>
+  </div>
+
+  <!-- Results page template -->
+  <div id="resultsPage" style="display:none">
+    <div class="results-wrap">
+      <h2>Sequencing Results</h2>
+      <div class="card">
+        <div class="row">
+          <a class="btn primary" id="viewerLink" target="_blank" rel="noopener">Open Client View</a>
+          <code id="viewerUrlCode"></code>
+        </div>
+      </div>
+      <div class="card">
+        <div class="grid">
+          <a class="btn secondary" id="downloadImageBtn" download="final.png">Download Picture</a>
+          <a class="btn secondary" id="downloadReportBtn" download="report.txt">Download report.txt</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // API configuration
+    const API_BASE_URL = window.location.origin;
+    
+    // State & logic
+    let MODE = 'single';
+    let USE_PICS = false;
+    let NUM_ARTS = 8;
+    let roadImage = null; 
+    let roadBlobUrl = '';
+    let roadDataUrl = '';
+    let artworks = []; 
+    let placements = [];
+    let currentResultId = null;
+    let currentViewerId = null;
+
+    const modeEls = document.querySelectorAll('input[name="mode"]');
+    const usePicsEl = document.getElementById('usePics');
+    const numEl = document.getElementById('numArtworks');
+    const roadInput = document.getElementById('roadInput');
+    const picsRow = document.getElementById('picsRow');
+    const picsInput = document.getElementById('picsInput');
+    const startBtn = document.getElementById('startBtn');
+    const doneBtn = document.getElementById('doneBtn');
+    const imgEl = document.getElementById('img');
+    const markersEl = document.getElementById('markers');
+    const overlayEl = document.getElementById('overlay');
+    const infoText = document.getElementById('infoText');
+    const choicesWrap = document.getElementById('choicesBox');
+    const previewWrap = document.getElementById('previewBox');
+    const choicesEl = document.getElementById('choices');
+    const prevImg = document.getElementById('prevImg');
+    let lastPreviewData = null;
+    const statusEl = document.getElementById('status');
+    const editBtns = document.getElementById('editBtns');
+    const doneBtns = document.getElementById('doneBtns');
+    let isEditing = false;
+
+    const markerW = 14, markerH = 28;
+    let isDragging=false, dragMoved=false, dragStartX=0, dragStartY=0, pStartX=0, pStartY=0;
+    let activeP=null; let activeSide=1;
+
+    modeEls.forEach(r=>r.onchange=()=>{ MODE=[...modeEls].find(x=>x.checked).value; updateInfo(); redraw(); });
+    usePicsEl.onchange=()=>{ USE_PICS=usePicsEl.checked; picsRow.style.display = USE_PICS?'':'none'; toggleRightSide(); updateInfo(); };
+    numEl.onchange=()=>{ NUM_ARTS = Math.max(1, parseInt(numEl.value)||1); updateInfo(); };
+
+    function updateInfo(){ infoText.textContent = `${MODE==='two'?'Two Way':'Single Way'} — ${USE_PICS?'Picture mode':'Numbers mode'} — Artworks: ${NUM_ARTS}`; }
+    function toggleRightSide(){ choicesWrap.style.display = USE_PICS?'':'none'; previewWrap.style.display = USE_PICS?'':'none'; }
+
+    // Convert blob URL to data URL
+    async function blobToDataURL(blob) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    roadInput.onchange = async () => {
+      const f=roadInput.files?.[0]; if(!f) return;
+      if(roadBlobUrl) URL.revokeObjectURL(roadBlobUrl);
+      roadBlobUrl = URL.createObjectURL(f);
+      roadDataUrl = await blobToDataURL(f);
+      roadImage = new Image(); 
+      roadImage.src = roadBlobUrl; 
+      await roadImage.decode();
+      imgEl.src = roadBlobUrl; 
+      status('Road image loaded');
+    };
+
+    picsInput.onchange = async () => {
+      artworks = [];
+      const files = [...(picsInput.files||[])].slice(0, NUM_ARTS);
+      for(let i=0;i<files.length;i++){
+        const blobUrl=URL.createObjectURL(files[i]); 
+        const dataUrl = await blobToDataURL(files[i]);
+        const img=new Image(); 
+        img.src=blobUrl; 
+        await img.decode();
+        artworks.push({ id:i+1, name:files[i].name, img, blobUrl, dataUrl });
+      }
+      buildChoices(); 
+      status(`${artworks.length} artwork(s) loaded`);
+    };
+
+    startBtn.onclick = () => {
+      MODE=[...modeEls].find(x=>x.checked).value; 
+      USE_PICS=usePicsEl.checked; 
+      NUM_ARTS=Math.max(1, parseInt(numEl.value)||1);
+      if(!roadImage){ 
+        alert('Please choose a road image first'); 
+        return; 
+      }
+      
+      // Disable start button and show done button
+      startBtn.disabled = true;
+      doneBtn.style.display = '';
+      editBtns.style.display = '';
+      isEditing = true;
+      
+      // Disable mode and configuration inputs
+      modeEls.forEach(r => r.disabled = true);
+      usePicsEl.disabled = true;
+      numEl.disabled = true;
+      roadInput.disabled = true;
+      picsInput.disabled = true;
+      
+      updateInfo(); 
+      toggleRightSide(); 
+      buildChoices(); 
+      imgEl.onclick=onStageClick; 
+      status('Stage ready: click on image to place rectangles');
+    };
+    
+    doneBtn.onclick = async () => {
+      if(!roadImage || placements.length===0){ 
+        alert('No placements to export'); 
+        return; 
+      }
+      await processResults();
+      showResultsView();
+    };
+
+    const doneBtnFooter = document.getElementById('doneBtnFooter');
+    if (doneBtnFooter) doneBtnFooter.onclick = doneBtn.onclick;
+    
+    document.getElementById('backToEdit').onclick = () => {
+      doneBtn.style.display = '';
+      editBtns.style.display = '';
+      doneBtns.style.display = 'none';
+      isEditing = true;
+      imgEl.onclick = onStageClick;
+      redraw();
+      status('Back to edit mode');
+    };
+
+    function getDrawInfo(){
+      const elW = imgEl.clientWidth, elH = imgEl.clientHeight;
+      const iw = roadImage.naturalWidth, ih = roadImage.naturalHeight;
+      const scale = Math.min(elW/iw, elH/ih);
+      const drawW = iw*scale, drawH = ih*scale;
+      const offX = (elW - drawW)/2; const offY = (elH - drawH)/2;
+      return { elW, elH, iw, ih, scale, drawW, drawH, offX, offY };
+    }
+    
+    function px(x){ const info=getDrawInfo(); return info.offX + x*info.scale; }
+    function py(y){ const info=getDrawInfo(); return info.offY + y*info.scale; }
+    
+    function nearestPlacement(x,y){ 
+      let best=null,bestD=12; 
+      for(const p of placements){ 
+        const d=Math.hypot(px(p.x)-px(x), py(p.y)-py(y)); 
+        if(d<bestD){ best=p; bestD=d; } 
+      } 
+      return best; 
+    }
+    
+    function ensurePlacement(x,y){ 
+      let p=nearestPlacement(x,y); 
+      if(!p){ 
+        p={x,y,s1_num:null,s2_num:null,s1_icon:null,s2_icon:null}; 
+        placements.push(p);
+      } 
+      return p; 
+    }
+    
+    function selectPlacement(p){ 
+      activeP=p; 
+      activeSide=1; 
+      redraw(); 
+      if(USE_PICS) buildChoices(); 
+    }
+    
+    function selectSide(s){ 
+      activeSide=s; 
+      redraw(); 
+    }
+
+    function onStageClick(e){
+      const r = imgEl.getBoundingClientRect();
+      const info = getDrawInfo();
+      const localX = (e.clientX - r.left) - info.offX;
+      const localY = (e.clientY - r.top) - info.offY;
+      
+      if (overlayEl.style.display==='block' || (USE_PICS && activeP)){
+        overlayEl.style.display='none'; 
+        activeP=null; 
+        redraw();
+        return;
+      }
+      
+      if (localX < 0 || localY < 0 || localX > info.drawW || localY > info.drawH) return;
+      
+      const rx = localX / info.drawW; 
+      const ry = localY / info.drawH;
+      const x = Math.round(rx * roadImage.naturalWidth);
+      const y = Math.round(ry * roadImage.naturalHeight);
+      const p = ensurePlacement(x,y); 
+      selectPlacement(p);
+    }
+
+    function redraw(){ 
+      markersEl.innerHTML=''; 
+      for(const p of placements){ 
+        const m=document.createElement('div'); 
+        m.className='marker'; 
+        m.style.left=(px(p.x)-markerW/2)+'px'; 
+        m.style.top=(py(p.y)-markerH/2)+'px'; 
+        
+        const s1=document.createElement('div'); 
+        s1.className='sq side1' + (activeP===p&&activeSide===1?' active':''); 
+        s1.textContent=(p.s1_num||p.s1_icon||''); 
+        
+        const s2=document.createElement('div'); 
+        s2.className='sq side2' + (activeP===p&&activeSide===2?' active':''); 
+        if(MODE==='two'){ 
+          s2.textContent=(p.s2_num||p.s2_icon||''); 
+        } 
+        
+        m.appendChild(s1); 
+        if(MODE==='two') m.appendChild(s2);
+        
+        // drag
+        m.onmousedown=(ev)=>{ 
+          ev.preventDefault(); 
+          isDragging=true; 
+          dragMoved=false; 
+          dragStartX=ev.clientX; 
+          dragStartY=ev.clientY; 
+          const pStartX=p.x, pStartY=p.y; 
+          selectPlacement(p); 
+          
+          const onMove=(mv)=>{ 
+            if(!isDragging) return; 
+            const dx=mv.clientX-dragStartX, dy=mv.clientY-dragStartY; 
+            if(Math.abs(dx)>2||Math.abs(dy)>2) dragMoved=true; 
+            const info=getDrawInfo(); 
+            const dxImg=dx/info.scale, dyImg=dy/info.scale; 
+            p.x=Math.max(0,Math.min(roadImage.naturalWidth, Math.round(pStartX+dxImg))); 
+            p.y=Math.max(0,Math.min(roadImage.naturalHeight, Math.round(pStartY+dyImg))); 
+            redraw(); 
+          }; 
+          
+          const onUp=()=>{ 
+            window.removeEventListener('mousemove',onMove); 
+            window.removeEventListener('mouseup',onUp); 
+            isDragging=false; 
+          }; 
+          
+          window.addEventListener('mousemove',onMove); 
+          window.addEventListener('mouseup',onUp); 
+        };
+        
+        // edit halves
+        s1.onclick=(ev)=>{ 
+          ev.stopPropagation(); 
+          if(dragMoved) return; 
+          selectPlacement(p); 
+          selectSide(1); 
+          if(!USE_PICS) openInlineEditor(p,1,m); 
+          else buildChoices(); 
+        };
+        
+        if(MODE==='two') s2.onclick=(ev)=>{ 
+          ev.stopPropagation(); 
+          if(dragMoved) return; 
+          selectPlacement(p); 
+          selectSide(2); 
+          if(!USE_PICS) openInlineEditor(p,2,m); 
+          else buildChoices(); 
+        };
+        
+        // hover preview
+        s1.onmouseenter=()=>hoverPreview(p,1); 
+        if(MODE==='two') s2.onmouseenter=()=>hoverPreview(p,2); 
+        s1.onmouseleave=()=>hoverPreview(null,0); 
+        if(MODE==='two') s2.onmouseleave=()=>hoverPreview(null,0);
+        
+        markersEl.appendChild(m); 
+      } 
+    }
+
+    function hoverPreview(p,side){ 
+      if(!p||!USE_PICS){ 
+        prevImg.removeAttribute('src'); 
+        return; 
+      } 
+      const id=(side===1?p.s1_icon:p.s2_icon); 
+      if(!id){ 
+        prevImg.removeAttribute('src'); 
+        return; 
+      } 
+      const ch=artworks.find(a=>a.id===id); 
+      if(ch) prevImg.src=ch.blobUrl; 
+    }
+
+    function openInlineEditor(p,side,markerEl){ 
+      const rect=markerEl.getBoundingClientRect(); 
+      overlayEl.style.display='block'; 
+      overlayEl.innerHTML=''; 
+      const row=document.createElement('div'); 
+      row.className='row'; 
+      
+      if(MODE==='single'){ 
+        const i=document.createElement('input'); 
+        i.value=p.s1_num||''; 
+        i.onkeydown=(e)=>{ 
+          if(e.key==='Enter'){ 
+            p.s1_num=parseInt(i.value)||null; 
+            overlayEl.style.display='none'; 
+            redraw(); 
+          }
+        }; 
+        row.appendChild(i); 
+        setTimeout(()=>i.focus(),0);
+      } else { 
+        const i1=document.createElement('input'); 
+        const i2=document.createElement('input'); 
+        i1.value=p.s1_num||''; 
+        i2.value=p.s2_num||''; 
+        const commit=()=>{ 
+          p.s1_num=parseInt(i1.value)||null; 
+          p.s2_num=parseInt(i2.value)||null; 
+          overlayEl.style.display='none'; 
+          redraw(); 
+        }; 
+        i1.onkeydown=(e)=>{ if(e.key==='Enter') commit(); }; 
+        i2.onkeydown=(e)=>{ if(e.key==='Enter') commit(); }; 
+        row.appendChild(i1); 
+        row.appendChild(i2); 
+        setTimeout(()=>{ (side===1?i1:i2).focus(); },0);
+      } 
+      
+      overlayEl.appendChild(row); 
+      const farRight=(rect.left<window.innerWidth/2); 
+      overlayEl.style.left=(rect.left+(farRight?rect.width+8:-overlayEl.clientWidth-8))+'px'; 
+      overlayEl.style.top=(rect.top+rect.height/2-overlayEl.clientHeight/2)+'px'; 
+    }
+
+    function buildChoices(){ 
+      choicesEl.innerHTML=''; 
+      if(!USE_PICS){ 
+        choicesWrap.style.display='none'; 
+        previewWrap.style.display='none'; 
+        return; 
+      } 
+      choicesWrap.style.display=''; 
+      previewWrap.style.display=''; 
+      
+      for(const a of artworks){ 
+        const row=document.createElement('div'); 
+        row.className='choice'; 
+        const im=document.createElement('img'); 
+        im.src=a.blobUrl; 
+        const lab=document.createElement('div'); 
+        lab.textContent=`${a.id} - ${a.name}`; 
+        row.appendChild(im); 
+        row.appendChild(lab); 
+        row.onclick=()=>{ 
+          if(!activeP) return; 
+          if(activeSide===1){ 
+            activeP.s1_icon=a.id; 
+          } else { 
+            activeP.s2_icon=a.id; 
+          } 
+          redraw(); 
+        }; 
+        choicesEl.appendChild(row); 
+      } 
+    }
+
+    async function processResults() {
+      // Generate final image matching the visual display
+      const c = document.createElement('canvas');
+      c.width = roadImage.naturalWidth;
+      c.height = roadImage.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(roadImage, 0, 0);
+      
+      // Match the marker dimensions used in display
+      const markerW = 14;
+      const markerH = 28;
+      const scale = roadImage.naturalWidth / imgEl.naturalWidth;
+      const scaledMarkerW = markerW * scale;
+      const scaledMarkerH = markerH * scale;
+      
+      for (const p of placements) {
+        const x = p.x;
+        const y = p.y;
+        
+        if (MODE === 'single') {
+          // Draw single blue rectangle
+          drawMarker(ctx, x, y, scaledMarkerW, scaledMarkerH, '#0066FF', '#0033AA', String(p.s1_num || p.s1_icon || ''));
+        } else {
+          // Draw two-sided rectangle
+          const halfH = scaledMarkerH / 2;
+          
+          // Blue half (top)
+          ctx.fillStyle = '#0066FF';
+          ctx.fillRect(x - scaledMarkerW/2, y - scaledMarkerH/2, scaledMarkerW, halfH);
+          ctx.strokeStyle = '#0033AA';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x - scaledMarkerW/2, y - scaledMarkerH/2, scaledMarkerW, halfH);
+          
+          // Red half (bottom)
+          ctx.fillStyle = '#FF3333';
+          ctx.fillRect(x - scaledMarkerW/2, y, scaledMarkerW, halfH);
+          ctx.strokeStyle = '#AA0000';
+          ctx.strokeRect(x - scaledMarkerW/2, y, scaledMarkerW, halfH);
+          
+          // Draw text
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = `bold ${9 * scale}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(p.s1_num || p.s1_icon || ''), x, y - halfH/2);
+          ctx.fillText(String(p.s2_num || p.s2_icon || ''), x, y + halfH/2);
+        }
+      }
+      
+      const imageDataUrl = c.toDataURL('image/png');
+      
+      // Generate report locally
+      const lines = [];
+      lines.push('Artwork SEQUENCING REPORT');
+      lines.push('==================================================');
+      lines.push('Generated: ' + new Date().toISOString());
+      lines.push('Road Type: ' + (MODE === 'single' ? 'Single Way' : 'Two Way'));
+      lines.push('Use Pictures: ' + (USE_PICS ? 'Yes' : 'No'));
+      lines.push('Unique Artworks: ' + NUM_ARTS);
+      lines.push('');
+      const counts1 = {}, counts2 = {};
+      for (const p of placements) {
+        const a1 = (p.s1_icon || p.s1_num || null); if (a1) { counts1[a1] = (counts1[a1] || 0) + 1; }
+        const a2 = (p.s2_icon || p.s2_num || null); if (a2) { counts2[a2] = (counts2[a2] || 0) + 1; }
+      }
+      lines.push('Artwork Requirements:');
+      lines.push('--------------------------------------------------');
+      for (let i = 1; i <= NUM_ARTS; i++) {
+        const total = (counts1[i] || 0) + (counts2[i] || 0);
+        if (MODE === 'two') lines.push(`Artwork #${i}: ${total} copies (Side 1: ${counts1[i]||0}, Side 2: ${counts2[i]||0})`);
+        else lines.push(`Artwork #${i}: ${counts1[i]||0} copies`);
+      }
+      const reportText = lines.join('\n');
+      
+      // Build artwork data URLs map
+      const artworkUrls = {};
+      artworks.forEach(a => { artworkUrls[a.id] = a.dataUrl || a.blobUrl; });
+      
+      // Build self-contained viewer HTML and blob URL
+      const viewerHTML = buildLocalViewerHTML(MODE, USE_PICS, placements, roadDataUrl || roadImage.src, artworkUrls);
+      const viewerBlob = new Blob([viewerHTML], { type: 'text/html' });
+      const viewerUrl = URL.createObjectURL(viewerBlob);
+      
+      // Update results template links
+      document.getElementById('downloadImageBtn').href = imageDataUrl;
+      document.getElementById('downloadReportBtn').href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(reportText);
+      document.getElementById('viewerLink').href = viewerUrl;
+      document.getElementById('viewerUrlCode').textContent = viewerUrl;
+      
+      // Store in memory for footer buttons
+      currentViewerId = viewerUrl;
+    }
+
+    function showResultsView() {
+      // Hide editing UI and show results buttons
+      doneBtn.style.display = 'none';
+      editBtns.style.display = 'none';
+      doneBtns.style.display = '';
+      isEditing = false;
+      imgEl.onclick = null;
+      status('Results ready');
+    }
+
+    document.getElementById('viewerBtn').onclick = () => {
+      if (currentViewerId) {
+        window.open(currentViewerId, '_blank');
+        status('Viewer opened in new window');
+      }
+    };
+
+    document.getElementById('downloadFinal').onclick = () => {
+      document.getElementById('downloadImageBtn').click();
+    };
+
+    document.getElementById('downloadReport').onclick = () => {
+      document.getElementById('downloadReportBtn').click();
+    };
+
+    document.getElementById('resetBtn').onclick = () => {
+      if (confirm('Are you sure you want to reset all placements?')) {
+        placements = [];
+        activeP = null;
+        redraw();
+        status('All placements cleared');
+      }
+    };
+
+    function drawMarker(ctx, cx, cy, w, h, fillColor, borderColor, text) {
+      const x = cx - w/2;
+      const y = cy - h/2;
+      
+      // Draw filled rectangle
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(x, y, w, h);
+      
+      // Draw border
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+      
+      // Draw text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(h * 0.32)}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, cx, cy);
+    }
+
+    function buildLocalViewerHTML(mode, usePics, placementsData, roadSrc, artworkUrlsMap){
+      const headerTitle = mode === 'two' ? 'Two Way' : 'Single Way';
+      const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artwork Sequence Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0f172a; --panel: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.08); --text:#e2e8f0; --muted:#94a3b8; }
+    html, body { height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; background: radial-gradient(1400px 700px at 10% -10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%); color: var(--text); }
+    #viewer { display: flex; flex-direction: column; height: 100vh; }
+    header { padding: 14px 16px; backdrop-filter: blur(8px); background: linear-gradient(180deg, rgba(2,6,23,0.75), rgba(2,6,23,0.55)); border-bottom: 1px solid var(--border); }
+    header h2 { margin: 0; font-size: 18px; letter-spacing: .2px; font-weight: 700; text-align: center; }
+    #main { flex: 1; position: relative; display:flex; align-items:center; justify-content:center; padding: 12px; }
+    #stage { position: relative; width: 96vw; height: 80vh; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 50px rgba(2,6,23,0.45); background: #0b1220; }
+    #img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #markers { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+    .marker { position:absolute; border:2px solid #000; background:#fff; width:14px; height:28px; display:flex; flex-direction: column; border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.35); pointer-events:auto; }
+    .marker .sq { flex:1; border-bottom:1px solid #000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 9px; color:#fff; cursor: pointer; }
+    .marker .sq:last-child { border-bottom:0; }
+    .marker .sq.side1 { border-color:#0033AA; background:#0066FF; }
+    .marker .sq.side2 { border-color:#AA0000; background:#FF3333; }
+    #preview { position:absolute; display:none; border: 3px solid #fff; background:rgba(15,23,42,0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.5); padding:8px; border-radius: 12px; z-index:9999; pointer-events: none; }
+#preview img { max-width:min(35vw,400px); max-height:min(35vh,400px); object-fit:contain; border:0; border-radius: 8px; display:block; }
+  </style>
+</head>
+<body>
+  <div id="viewer">
+    <header>
+      <h2>Artwork Sequence - ${headerTitle} Road</h2>
+    </header>
+    <div id="main">
+      <div id="stage">
+        <img id="img" src="${roadSrc}" />
+        <div id="markers"></div>
+        <div id="preview"><img id="prevImg" /></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const MODE = ${JSON.stringify(mode)};
+    const USE_PICS = ${JSON.stringify(usePics)};
+    const placements = ${JSON.stringify(placementsData)};
+    const artworkUrls = ${JSON.stringify(artworkUrlsMap)};
+    const markerW = 14, markerH = 28;
+    const imgEl = document.getElementById('img');
+    const markersEl = document.getElementById('markers');
+    const previewEl = document.getElementById('preview');
+    const prevImg = document.getElementById('prevImg');
+    let lastPreviewData = null;
+    function getDrawInfo(){ const elW=imgEl.clientWidth, elH=imgEl.clientHeight; const iw=imgEl.naturalWidth, ih=imgEl.naturalHeight; const scale=Math.min(elW/iw, elH/ih); const drawW=iw*scale, drawH=ih*scale; const offX=(elW-drawW)/2, offY=(elH-drawH)/2; return {scale, offX, offY, drawW, drawH}; }
+    function px(x){ const i=getDrawInfo(); return i.offX + x*i.scale; }
+    function py(y){ const i=getDrawInfo(); return i.offY + y*i.scale; }
+    function redraw(){ markersEl.innerHTML=''; for(const p of placements){ const m=document.createElement('div'); m.className='marker'; m.style.left=(px(p.x)-markerW/2)+'px'; m.style.top=(py(p.y)-markerH/2)+'px'; const s1=document.createElement('div'); s1.className='sq side1'; s1.textContent=(p.s1_num||p.s1_icon||''); const s2=document.createElement('div'); s2.className='sq side2'; if(MODE==='two'){ s2.textContent=(p.s2_num||p.s2_icon||''); } m.appendChild(s1); if(MODE==='two') m.appendChild(s2); if(USE_PICS){ s1.onmouseenter=()=>showPreviewAt(p.s1_icon, p.x, p.y); s1.onmouseleave=hidePreview; if(MODE==='two'){ s2.onmouseenter=()=>showPreviewAt(p.s2_icon, p.x, p.y); s2.onmouseleave=hidePreview; } } markersEl.appendChild(m);} }
+    function showPreview(iconId){ if(!iconId || !artworkUrls[iconId]){ hidePreview(); return; } prevImg.src=artworkUrls[iconId]; previewEl.style.display='block'; positionPreview(); }
+    function hidePreview(){ previewEl.style.display='none'; }
+    function positionPreview(){
+      const stage = document.getElementById('stage');
+      const rect = stage.getBoundingClientRect();
+      const space = 10;
+      const centerX = rect.left + rect.width/2;
+      const mouseX = window.event && typeof window.event.clientX==='number' ? window.event.clientX : centerX;
+      const placeRight = mouseX < centerX;
+      const imgW = previewEl.offsetWidth, imgH = previewEl.offsetHeight;
+      const x = placeRight ? (rect.width - imgW - space) : (space);
+      const y = (rect.height/2 - imgH/2);
+      previewEl.style.left = x + 'px';
+      previewEl.style.top = Math.max(4, Math.min(y, rect.height - imgH - 4)) + 'px';
+      previewEl.style.transform = 'translateZ(0)';
+    }
+    function positionPreviewAt(imgX, imgY){
+      const info = getDrawInfo();
+      const roadImage = imgEl;
+      const placeRight = imgX < (roadImage.naturalWidth/2);
+      
+      // Wait for preview image to load to get dimensions
+      setTimeout(() => {
+        const imgW = previewEl.offsetWidth || 400;
+        const imgH = previewEl.offsetHeight || 400;
+        const margin = 20; // margin from edge of road image
+        
+        // Calculate position within the road image bounds
+        let x, y;
+        
+        if (placeRight) {
+          // Place on right side of road image
+          x = info.offX + info.drawW - imgW - margin;
+        } else {
+          // Place on left side of road image
+          x = info.offX + margin;
+        }
+        
+        // Center vertically within road image
+        y = info.offY + (info.drawH - imgH) / 2;
+        
+        // Ensure preview stays within road image bounds
+        x = Math.max(info.offX + margin, Math.min(x, info.offX + info.drawW - imgW - margin));
+        y = Math.max(info.offY + margin, Math.min(y, info.offY + info.drawH - imgH - margin));
+        
+        previewEl.style.left = x + 'px';
+        previewEl.style.top = y + 'px';
+      }, 10);
+    }
+    function showPreviewAt(iconId, imgX, imgY){
+      if(!iconId || !artworkUrls[iconId]){ hidePreview(); return; }
+      lastPreviewData = { iconId, imgX, imgY };
+      prevImg.onload = () => {
+        if(lastPreviewData && lastPreviewData.iconId === iconId){
+          positionPreviewAt(imgX, imgY);
+        }
+      };
+      prevImg.src = artworkUrls[iconId];
+      previewEl.style.display = 'block';
+      // Initial position (in case image already cached)
+      positionPreviewAt(imgX, imgY);
+    }
+    window.addEventListener('resize', redraw);
+    imgEl.onload = () => { redraw(); if(lastPreviewData){ positionPreviewAt(lastPreviewData.imgX, lastPreviewData.imgY); } };
+    redraw();
+  </scr${''}ipt>
+</body>
+</html>`;
+      return html;
+    }
+
+    function status(msg) {
+      statusEl.textContent = msg;
+      setTimeout(() => {
+        if (statusEl.textContent === msg) statusEl.textContent = '';
+      }, 3000);
+    }
+
+    // Keyboard navigation for switching between blue/red sides
+    document.addEventListener('keydown', (e) => {
+      if (!activeP || MODE !== 'two' || !isEditing) return;
+      
+      if (e.key === 'ArrowDown' && activeSide === 1) {
+        selectSide(2);
+        if (USE_PICS) buildChoices();
+      } else if (e.key === 'ArrowUp' && activeSide === 2) {
+        selectSide(1);
+        if (USE_PICS) buildChoices();
+      }
+    });
+    
+    updateInfo();
+    toggleRightSide();
+  </script>
+</body>
+</html>
