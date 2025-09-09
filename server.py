@@ -28,9 +28,10 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parent
 HTML_PATH = BASE_DIR / "web_sequencer.html"
-VIEWER_HTML_PATH = BASE_DIR / "viewer.html"
+DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data")).resolve()
+DATA_DIR.mkdir(exist_ok=True)
 
-# In-memory storage for viewers and results (in production, use a database)
+# In-memory storage for viewer metadata
 viewers: Dict[str, Dict[str, Any]] = {}
 results: Dict[str, Dict[str, Any]] = {}
 
@@ -151,10 +152,21 @@ def health():
 async def create_viewer(data: dict = Body(...)):
     """Create a shareable viewer link with untraceable ID"""
     viewer_id = str(uuid.uuid4())
+    
+    # Generate viewer HTML
+    viewer_html = generate_viewer_html_with_data(data)
+    
+    # Save HTML to file
+    viewer_file_path = DATA_DIR / f"viewer_{viewer_id}.html"
+    with open(viewer_file_path, "w", encoding="utf-8") as f:
+        f.write(viewer_html)
+    
+    # Store metadata
     viewers[viewer_id] = {
-        "data": data,
         "created_at": datetime.now().isoformat(),
+        "file_path": str(viewer_file_path)
     }
+    
     return {
         "viewer_id": viewer_id, 
         "url": f"/viewer/{viewer_id}",
@@ -167,20 +179,14 @@ async def get_viewer(viewer_id: str):
     if viewer_id not in viewers:
         return JSONResponse({"error": "Viewer not found"}, status_code=404)
     
-    if VIEWER_HTML_PATH.exists():
-        return FileResponse(str(VIEWER_HTML_PATH))
+    viewer_metadata = viewers[viewer_id]
+    viewer_file_path = Path(viewer_metadata["file_path"])
     
-    # If viewer.html doesn't exist, generate it dynamically
-    viewer_html = generate_viewer_html()
-    return HTMLResponse(viewer_html)
+    if viewer_file_path.exists():
+        return FileResponse(str(viewer_file_path))
+    else:
+        return JSONResponse({"error": "Viewer file not found"}, status_code=404)
 
-@app.get("/api/viewer/{viewer_id}/data")
-async def get_viewer_data(viewer_id: str):
-    """Get viewer data for a specific ID"""
-    if viewer_id not in viewers:
-        raise HTTPException(status_code=404, detail="Viewer not found")
-    
-    return viewers[viewer_id]["data"]
 
 @app.post("/api/save-result")
 async def save_result(data: dict = Body(...)):
@@ -278,6 +284,175 @@ async def download_file(result_id: str, file_type: str):
             raise HTTPException(status_code=400, detail="Invalid image data")
     else:
         raise HTTPException(status_code=400, detail="Invalid file type")
+
+def generate_viewer_html_with_data(data):
+    """Generate self-contained viewer HTML with embedded data"""
+    mode = data.get("mode", "single")
+    use_pics = data.get("use_pics", False)
+    placements = data.get("placements", [])
+    road_image = data.get("road_image", "")
+    artwork_urls = data.get("artwork_urls", {})
+    
+    header_title = "Two Way" if mode == "two" else "Single Way"
+    
+    return f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artwork Sequence Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{{
+      --bg: #0f172a;
+      --panel: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.08);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }}
+    html, body {{ height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; background: radial-gradient(1400px 700px at 10% -10%, #0b1220 0%, #0f172a 60%, #0a0f1f 100%); color: var(--text); }}
+    #viewer {{ display: flex; flex-direction: column; height: 100vh; }}
+    header {{ padding: 14px 16px; backdrop-filter: blur(8px); background: linear-gradient(180deg, rgba(2,6,23,0.75), rgba(2,6,23,0.55)); border-bottom: 1px solid var(--border); }}
+    header h2 {{ margin: 0; font-size: 18px; letter-spacing: .2px; font-weight: 700; text-align: center; }}
+    #main {{ flex: 1; position: relative; display:flex; align-items:center; justify-content:center; padding: 12px; }}
+    #stage {{ position: relative; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 12px 50px rgba(2,6,23,0.45); background: #0b1220; }}
+    #img {{ width: 100%; height: 100%; object-fit: contain; display: block; }}
+    #markers {{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }}
+    .marker {{ position:absolute; border:2px solid #000; background:#fff; width:14px; height:28px; display:flex; flex-direction: column; border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.35); pointer-events:auto; }}
+    .marker .sq {{ flex:1; border-bottom:1px solid #000; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 9px; color:#fff; cursor: pointer; }}
+    .marker .sq:last-child {{ border-bottom:0; }}
+    .marker .sq.side1 {{ border-color:#0033AA; background:#0066FF; }}
+    .marker .sq.side2 {{ border-color:#AA0000; background:#FF3333; }}
+    #preview {{ position:absolute; display:none; border: 3px solid #fff; background:rgba(15,23,42,0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.5); padding:8px; border-radius: 12px; z-index:9999; pointer-events: none; }}
+    #preview img {{ max-width:min(35vw,400px); max-height:min(35vh,400px); object-fit:contain; border:0; border-radius: 8px; display:block; }}
+  </style>
+</head>
+<body>
+  <div id="viewer">
+    <header>
+      <h2>Artwork Sequence - {header_title} Road</h2>
+    </header>
+    <div id="main">
+      <div id="stage">
+        <img id="img" src="{road_image}" />
+        <div id="markers"></div>
+        <div id="preview"><img id="prevImg" /></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const MODE = '{mode}';
+    const USE_PICS = {str(use_pics).lower()};
+    const placements = {json.dumps(placements)};
+    const artworkUrls = {json.dumps(artwork_urls)};
+    const markerW = 14, markerH = 28;
+    
+    const imgEl = document.getElementById('img');
+    const markersEl = document.getElementById('markers');
+    const previewEl = document.getElementById('preview');
+    const prevImg = document.getElementById('prevImg');
+    
+    function getDrawInfo() {{
+      const elW = imgEl.clientWidth, elH = imgEl.clientHeight;
+      const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
+      const scale = Math.min(elW/iw, elH/ih);
+      const drawW = iw*scale, drawH = ih*scale;
+      const offX = (elW - drawW)/2;
+      const offY = (elH - drawH)/2;
+      return {{ elW, elH, iw, ih, scale, drawW, drawH, offX, offY }};
+    }}
+    
+    function px(x) {{
+      const info = getDrawInfo();
+      return info.offX + x*info.scale;
+    }}
+    
+    function py(y) {{
+      const info = getDrawInfo();
+      return info.offY + y*info.scale;
+    }}
+    
+    function redraw() {{
+      markersEl.innerHTML = '';
+      for (const p of placements) {{
+        const m = document.createElement('div');
+        m.className = 'marker';
+        m.style.left = (px(p.x) - markerW/2) + 'px';
+        m.style.top = (py(p.y) - markerH/2) + 'px';
+        
+        const s1 = document.createElement('div');
+        s1.className = 'sq side1';
+        s1.textContent = (p.s1_num || p.s1_icon || '');
+        
+        const s2 = document.createElement('div');
+        s2.className = 'sq side2';
+        if (MODE === 'two') {{
+          s2.textContent = (p.s2_num || p.s2_icon || '');
+        }}
+        
+        m.appendChild(s1);
+        if (MODE === 'two') m.appendChild(s2);
+        
+        // Hover preview for pictures
+        if (USE_PICS) {{
+          s1.onmouseenter = (e) => showPreview(e, p.s1_icon, p.x);
+          s1.onmouseleave = () => hidePreview();
+          if (MODE === 'two') {{
+            s2.onmouseenter = (e) => showPreview(e, p.s2_icon, p.x);
+            s2.onmouseleave = () => hidePreview();
+          }}
+        }}
+        
+        markersEl.appendChild(m);
+      }}
+    }}
+    
+    function showPreview(e, iconId, imgX) {{
+      if (!iconId || !artworkUrls[iconId]) {{
+        hidePreview();
+        return;
+      }}
+      prevImg.src = artworkUrls[iconId];
+      previewEl.style.display = 'block';
+      
+      // Position preview
+      setTimeout(() => {{
+        const info = getDrawInfo();
+        const roadImage = imgEl;
+        const placeRight = imgX < (roadImage.naturalWidth/2);
+        
+        const imgW = previewEl.offsetWidth || 400;
+        const imgH = previewEl.offsetHeight || 400;
+        const margin = 20;
+        
+        let x, y;
+        
+        if (placeRight) {{
+          x = info.offX + info.drawW - imgW - margin;
+        }} else {{
+          x = info.offX + margin;
+        }}
+        
+        y = info.offY + (info.drawH - imgH) / 2;
+        
+        x = Math.max(info.offX + margin, Math.min(x, info.offX + info.drawW - imgW - margin));
+        y = Math.max(info.offY + margin, Math.min(y, info.offY + info.drawH - imgH - margin));
+        
+        previewEl.style.left = x + 'px';
+        previewEl.style.top = y + 'px';
+      }}, 10);
+    }}
+    
+    function hidePreview() {{
+      previewEl.style.display = 'none';
+    }}
+    
+    window.addEventListener('resize', redraw);
+    imgEl.onload = redraw;
+    redraw();
+  </script>
+</body>
+</html>"""
 
 def generate_viewer_html():
     """Generate viewer HTML template"""
@@ -476,6 +651,13 @@ async def cleanup_old_data():
                 viewers_to_remove.append(viewer_id)
         
         for viewer_id in viewers_to_remove:
+            # Delete file from disk
+            viewer_metadata = viewers.get(viewer_id, {})
+            if "file_path" in viewer_metadata:
+                file_path = Path(viewer_metadata["file_path"])
+                if file_path.exists():
+                    file_path.unlink()
+                    logger.info(f"Deleted viewer file: {file_path.name}")
             del viewers[viewer_id]
         
         # Cleanup results

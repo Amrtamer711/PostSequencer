@@ -222,13 +222,26 @@ DATA_RETENTION_DAYS = 30     # How long to keep data
 MAX_STORAGE_ITEMS = 10000    # Maximum items to store
 ```
 
+### Storage Implementation
+
+The application uses disk-based storage for viewer HTML files:
+- Viewer HTML files are stored in `/data/` directory
+- Each viewer gets a unique file: `viewer_{uuid}.html`
+- Files are self-contained with all data embedded
+- Metadata is kept in memory for fast access
+
+On Render deployment:
+- A 1GB persistent disk is mounted at `/data`
+- Files persist across deployments and restarts
+- Automatic cleanup removes files older than 30 days
+
 ### Production Recommendations
 
-For production deployment, consider:
-1. **Database Storage**: Replace in-memory storage with PostgreSQL/MongoDB
-2. **S3/Blob Storage**: Store images in cloud storage instead of base64 in memory
-3. **Redis Cache**: Use Redis for temporary viewer data with TTL
-4. **Monitoring**: Set up alerts for storage usage and cleanup failures
+For larger scale deployments, consider:
+1. **Database Storage**: Replace in-memory metadata with PostgreSQL/MongoDB
+2. **S3/Blob Storage**: Store HTML files in cloud storage for better scalability
+3. **CDN**: Serve viewer files through a CDN for global access
+4. **Monitoring**: Set up alerts for disk usage and cleanup failures
 5. **Archival**: Archive old data instead of deleting if needed for compliance
 
 ## Deployment
