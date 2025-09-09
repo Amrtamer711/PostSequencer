@@ -27,9 +27,9 @@ app.add_middleware(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-HTML_PATH = BASE_DIR / "web_sequencer.html"
 TEMPLATES_DIR = BASE_DIR / "templates"
 TEMPLATES_DIR.mkdir(exist_ok=True)
+HTML_PATH = TEMPLATES_DIR / "web_sequencer.html"
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data")).resolve()
 DATA_DIR.mkdir(exist_ok=True)
 
